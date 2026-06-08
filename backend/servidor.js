@@ -191,6 +191,81 @@ app.post("/sync/:disciplina", autenticar, async (req, res) => {
   }
 });
 
+// Rota para a Secretaria/Instituição ver as frequências
+app.get("/institucional/frequencia/:disciplina", async (req, res) => {
+  const disciplina = req.params.disciplina;
+
+  try {
+    const db = nano.use(disciplina);
+
+    // Busca todos os documentos dentro do banco daquela disciplina
+    const listaDocs = await db.list({ include_docs: true });
+
+    // Se você salvou usando o padrão 'chamada_atualizada' ou 'chamada_DATA'
+    // Vamos filtrar apenas os documentos que contêm os dados dos alunos
+    const chamadas = listaDocs.rows
+      .map((row) => row.doc)
+      .filter((doc) => doc._id.startsWith("chamada")); // filtra lixos de configuração se houver
+
+    if (chamadas.length === 0) {
+      return res
+        .status(404)
+        .json({ mensagem: "Nenhuma chamada registrada para esta disciplina." });
+    }
+
+    // Objeto para consolidar o relatório final dos alunos
+    const relatorioFrequencia = {};
+
+    // Processa cada chamada para somar as presenças
+    chamadas.forEach((chamada) => {
+      chamada.dados.forEach((alunoObj) => {
+        const nome = alunoObj.aluno;
+
+        if (!relatorioFrequencia[nome]) {
+          relatorioFrequencia[nome] = {
+            nome: nome,
+            presencas: 0,
+            faltas: 0,
+            totalAulas: 0,
+          };
+        }
+
+        // Verifica o status de cada aula dentro do array do aluno
+        alunoObj.aulas.forEach((aula) => {
+          relatorioFrequencia[nome].totalAulas++;
+          if (aula.status === "presente") {
+            relatorioFrequencia[nome].presencas++;
+          } else {
+            relatorioFrequencia[nome].faltas++;
+          }
+        });
+      });
+    });
+
+    // Transforma o objeto em um array e calcula a porcentagem de frequência de cada um
+    const resultadoFinal = Object.values(relatorioFrequencia).map((aluno) => {
+      const porcentagem =
+        aluno.totalAulas > 0
+          ? ((aluno.presencas / aluno.totalAulas) * 100).toFixed(1)
+          : 0;
+
+      return {
+        nome: aluno.nome,
+        presencas: aluno.presencas,
+        faltas: aluno.faltas,
+        totalAulas: aluno.totalAulas,
+        frequenciaPorcentagem: `${porcentagem}%`,
+        situacao: porcentagem >= 75 ? "FI" : "RE", // FI = Frequência Insuficiente (Abaixo de 75% na UFSC reprova)
+      };
+    });
+
+    res.json(resultadoFinal);
+  } catch (err) {
+    console.error("Erro ao gerar relatório institucional:", err);
+    res.status(500).send("Erro interno ao buscar dados institucionais");
+  }
+});
+
 app.listen(7000, () => {
   console.log("Servidor iniciado");
 });
