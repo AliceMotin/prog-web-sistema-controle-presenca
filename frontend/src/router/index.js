@@ -21,7 +21,6 @@ const router = createRouter({
       path: "/chamada/:id",
       name: "Chamada",
       component: Chamada,
-      meta: { requerAutenticacao: true },
     },
     {
       path: "/institucional",

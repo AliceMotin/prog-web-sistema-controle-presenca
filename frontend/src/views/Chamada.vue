@@ -6,26 +6,21 @@ export default {
 
   data() {
     return {
-      disciplinaId: "", // Vai guardar o código da matéria (ex: dec0007)
-      alunos: [], // Lista de alunos com as suas respetivas aulas/presenças
-      //statusMensagem: "A carregar lista de alunos...",
-      localDB: null, // Instância do banco PouchDB desta disciplina
+      disciplinaId: "",
+      alunos: [],
+      localDB: null,
     };
   },
 
   async mounted() {
-    // 1. Pega o nome da disciplina que veio pela URL do Vue Router
     this.disciplinaId = this.$route.params.id;
 
-    // 2. Conecta ao banco PouchDB específico desta disciplina
     this.localDB = new PouchDB(this.disciplinaId);
 
-    // 3. Tenta carregar os dados
     await this.carregarDadosDisciplina();
 
     window.addEventListener("online", this.enviarDadosParaServidor);
   },
-  // Importante: Limpa o vigia quando o componente for destruído (mudar de página)
   unmounted() {
     window.removeEventListener("online", this.enviarDadosParaServidor);
   },
@@ -33,24 +28,20 @@ export default {
   methods: {
     async enviarDadosParaServidor() {
       try {
-        this.statusMensagem = "A tentar sincronizar com o servidor central...";
-
         const docLocal = await this.localDB.get("lista_alunos");
 
-        // 🔴 1. CAPTURA E FORMATA A DATA DE HOJE (Ex: "07-06-2026")
         const hoje = new Date();
         const dia = String(hoje.getDate()).padStart(2, "0");
         const mes = String(hoje.getMonth() + 1).padStart(2, "0"); // Janeiro é 0
         const ano = hoje.getFullYear();
         const dataFormatada = `${dia}-${mes}-${ano}`;
 
-        // 🔴 2. MONTA O CORPO COM O ID ÚNICO POR DIA
         const corpoRequisicao = {
           docs: [
             {
-              _id: `chamada_${dataFormatada}`, // 👈 Ex: chamada_07-06-2026
-              data: `${dia}/${mes}/${ano}`, // Guarda a data legível também
-              dados: docLocal.dados, // O array de alunos com suas presenças
+              _id: `chamada_${dataFormatada}`,
+              data: `${dia}/${mes}/${ano}`,
+              dados: docLocal.dados,
             },
           ],
         };
@@ -85,7 +76,6 @@ export default {
       try {
         const token = localStorage.getItem("token_ufsc");
 
-        // Tenta buscar os dados mais frescos do servidor do professor
         const resposta = await fetch(
           `http://localhost:7000/disciplinas/${this.disciplinaId}`,
           {
@@ -100,13 +90,10 @@ export default {
 
         const dadosServidor = await resposta.json();
 
-        // Se pegou do servidor, vamos guardar/atualizar no PouchDB local para garantir o offline
         await this.salvarAlunosNoPouchDB(dadosServidor);
 
         this.alunos = dadosServidor;
-        //this.statusMensagem = "Alunos sincronizados via servidor.";
       } catch (error) {
-        // 🚨 O MILAGRE DO OFFLINE: Se o fetch falhar, busca do PouchDB!
         this.statusMensagem =
           "Modo Offline: Carregando dados salvos localmente...";
         console.warn(error.message);
@@ -117,10 +104,8 @@ export default {
 
     async salvarAlunosNoPouchDB(dadosAlunos) {
       try {
-        // Tenta buscar se já existe um documento com a lista de alunos
         const docExistente = await this.localDB.get("lista_alunos");
 
-        // Se existe, atualiza mantendo o _rev para evitar conflito
         await this.localDB.put({
           _id: "lista_alunos",
           _rev: docExistente._rev,
@@ -128,7 +113,6 @@ export default {
         });
       } catch (err) {
         if (err.status === 404) {
-          // Se não existe (404), cria do zero
           await this.localDB.put({
             _id: "lista_alunos",
             dados: dadosAlunos,
@@ -149,105 +133,30 @@ export default {
     },
 
     alterarPresenca(index, status) {
-      // Cria uma aula fake de teste (ex: aula do dia de hoje)
       const dataHoje = new Date().toLocaleDateString("pt-BR");
 
-      // Procura se já existe um registo para o dia de hoje nas aulas do aluno
       const aulaHojeIndex = this.alunos[index].aulas.findIndex(
         (a) => a.data === dataHoje
       );
 
       if (aulaHojeIndex !== -1) {
-        // Se já existe, atualiza o status (Presença ou Falta)
         this.alunos[index].aulas[aulaHojeIndex].status = status;
       } else {
-        // Se não existe, adiciona uma nova aula à lista dele
         this.alunos[index].aulas.push({ data: dataHoje, status: status });
       }
     },
 
-    // Retorna o status atual do aluno no dia de hoje para pintar os botões
     obterStatusHoje(aluno) {
       const dataHoje = new Date().toLocaleDateString("pt-BR");
       const aula = aluno.aulas.find((a) => a.data === dataHoje);
       return aula ? aula.status : "pendente";
     },
 
-    // async gerarMuitasChamadasDeTeste() {
-    //   this.carregando = true;
-    //   this.statusMensagem = "Injetando carga de dados de teste...";
-
-    //   const disciplinaAlvo = "dec0020";
-    //   const token = localStorage.getItem("token_ufsc");
-
-    //   const alunosBase = ["Ana maria", "pedro", "cintia"];
-    //   const pacotesDeChamadas = [];
-
-    //   for (let i = 5; i >= 1; i--) {
-    //     const dataPassada = new Date();
-    //     dataPassada.setDate(dataPassada.getDate() - i); // Subtrai i dias da data de hoje
-
-    //     const dia = String(dataPassada.getDate()).padStart(2, "0");
-    //     const mes = String(dataPassada.getMonth() + 1).padStart(2, "0");
-    //     const ano = dataPassada.getFullYear();
-
-    //     const idFormatado = `chamada_${dia}-${mes}-${ano}`;
-    //     const dataLegivel = `${dia}/${mes}/${ano}`;
-
-    //     // Monta a lista de alunos com presenças/faltas aleatórias para dar realismo ao gráfico/tabela
-    //     const dadosAlunosSorteados = alunosBase.map((nome) => {
-    //       // Sorteia "presente" ou "falta" (75% de chance de presente para a maioria passar)
-    //       const statusSorteado = Math.random() > 0.25 ? "presente" : "falta";
-    //       return {
-    //         aluno: nome,
-    //         aulas: [{ data: dataLegivel, status: statusSorteado }],
-    //       };
-    //     });
-
-    //     // Coloca o documento no pacote
-    //     pacotesDeChamadas.push({
-    //       _id: idFormatado,
-    //       data: dataLegivel,
-    //       dados: dadosAlunosSorteados,
-    //     });
-    //   }
-
-    //   try {
-    //     // 3. Dispara o pacote completo com os 5 dias de uma vez para a rota de sincronização
-    //     const resposta = await fetch(
-    //       `http://localhost:7000/sync/${disciplinaAlvo}`,
-    //       {
-    //         method: "POST",
-    //         headers: {
-    //           "Content-Type": "application/json",
-    //           Authorization: `Bearer ${token}`,
-    //         },
-    //         body: JSON.stringify({ docs: pacotesDeChamadas }), // O server.js faz o loop por cada um deles!
-    //       }
-    //     );
-
-    //     if (!resposta.ok)
-    //       throw new Error("O servidor rejeitou a carga de testes.");
-
-    //     alert(
-    //       `Sucesso! 5 chamadas históricas foram injetadas no banco "${disciplinaAlvo}".`
-    //     );
-    //     this.statusMensagem = "Dados de teste injetados com sucesso!";
-    //   } catch (error) {
-    //     console.error("Erro ao injetar chamadas:", error);
-    //     alert("Falha ao injetar dados de teste no CouchDB.");
-    //   } finally {
-    //     this.carregando = false;
-    //   }
-    // },
-
     async salvarChamadaCompleta() {
       try {
-        // 1. Salva localmente
         await this.salvarAlunosNoPouchDB(this.alunos);
 
-        // 2. Dispara o envio para o servidor
-        await this.enviarDadosParaServidor(); // 👈 ESSA LINHA TEM DE ESTAR AQUI!
+        await this.enviarDadosParaServidor();
 
         alert("Chamada registrada com sucesso!");
       } catch (e) {
@@ -259,39 +168,11 @@ export default {
 </script>
 
 <template>
-  <!-- <div
-    class="testes-secao"
-    style="
-      margin-top: 20px;
-      padding: 15px;
-      background: #fff3cd;
-      border: 1px solid #ffeba2;
-      border-radius: 8px;
-    "
-  >
-    <h4>🧪 Zona de Testes Acadêmicos</h4>
-    <p>
-      Clique no botão abaixo para gerar instantaneamente 5 dias de chamadas
-      retroativas no CouchDB para testes.
-    </p>
-    <button
-      class="btn-seed"
-      @click="gerarMuitasChamadasDeTeste"
-      :disabled="carregando"
-    >
-      ⚡ Injetar 5 Chamadas de Histórico
-    </button>
-  </div> -->
-
   <div class="chamada-container">
     <header class="topo">
       <button @click="$router.push('/')">Voltar ao Painel</button>
       <h2>Chamada: {{ disciplinaId ? disciplinaId.toUpperCase() : "" }}</h2>
     </header>
-
-    <!-- <div class="status-barra">
-      <p>{{ statusMensagem }}</p>
-    </div> -->
 
     <main class="lista-alunos">
       <div

@@ -2,106 +2,88 @@
 // Importamos o PouchDB para gerenciar o banco de dados no navegador
 //import PouchDB from 'pouchdb'
 
-import PouchDB from 'pouchdb/dist/pouchdb.js'
+import PouchDB from "pouchdb/dist/pouchdb.js";
 
 export default {
-  name: 'Sincroniza',
+  name: "Sincroniza",
 
   data() {
     return {
-      professorId: '',
-      disciplinas: [], // Armazenará a lista vinda do servidor (ex: ['dec0007', 'dec0020'])
-      statusMensagem: 'Carregando informações do professor...',
+      professorId: "",
+      disciplinas: [],
       carregando: true,
-    }
+    };
   },
 
-  // O mounted() roda automaticamente assim que a tela abre no navegador
   async mounted() {
-    await this.carregarDisciplinasDoServidor()
+    await this.carregarDisciplinasDoServidor();
   },
 
   methods: {
     async carregarDisciplinasDoServidor() {
       try {
-        // 1. Pega o token armazenado no Passo de Login
-        const token = localStorage.getItem('token_ufsc')
+        const token = localStorage.getItem("token_ufsc");
 
         if (!token) {
-          this.statusMensagem = 'Usuário não autenticado. Redirecionando...'
-          setTimeout(() => this.$router.push('/login'), 2000)
-          return
+          this.statusMensagem = "Usuário não autenticado. Redirecionando...";
+          setTimeout(() => this.$router.push("/login"), 2000);
+          return;
         }
 
-        // 2. Faz o GET enviando o token no cabeçalho Authorization
-        const resposta = await fetch('http://localhost:7000/disciplinas', {
-          method: 'GET',
+        const resposta = await fetch("http://localhost:7000/disciplinas", {
+          method: "GET",
           headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`, // O crachá que o servidor exige!
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
-        })
+        });
 
         if (!resposta.ok) {
           if (resposta.status === 401) {
-            this.statusMensagem = 'Sessão expirada. Faça login novamente.'
-            this.$router.push('/login')
+            this.statusMensagem = "Sessão expirada. Faça login novamente.";
+            this.$router.push("/login");
           } else {
-            this.statusMensagem = 'Erro ao buscar disciplinas no servidor.'
+            this.statusMensagem = "Erro ao buscar disciplinas no servidor.";
           }
-          return
+          return;
         }
 
-        // 3. Guarda as disciplinas encontradas na variável do Vue
-        this.disciplinas = await resposta.json()
-        this.statusMensagem = 'Disciplinas carregadas com sucesso! Inicializando bancos locais...'
+        this.disciplinas = await resposta.json();
+        await this.inicializarBancosLocais();
 
-        // 4. Cria os bancos locais no PouchDB (Lógica baseada no index.html do professor)
-        await this.inicializarBancosLocais()
-
-        this.carregando = false
+        this.carregando = false;
       } catch (error) {
-        this.statusMensagem = 'Você está offline ou o servidor está desligado. Usando dados locais.'
-        console.error(error)
-        this.carregando = false
-        // Aqui depois podemos ler do PouchDB se já existir histórico offline!
+        this.statusMensagem =
+          "Você está offline ou o servidor está desligado. Usando dados locais.";
+        console.error(error);
+        this.carregando = false;
       }
     },
 
     async inicializarBancosLocais() {
-      // Cria/conecta a uma lista de controle local no PouchDB
-      const dbListaControle = new PouchDB('lista_disciplinas_local')
+      const dbListaControle = new PouchDB("lista_disciplinas_local");
 
-      // Salva a lista de disciplinas no banco local do navegador
       await dbListaControle
         .put({
-          _id: 'config_disciplinas',
+          _id: "config_disciplinas",
           lista: this.disciplinas,
         })
         .catch((err) => {
-          // Se já existir o documento, podemos atualizar ou ignorar o erro de conflito
-          if (err.status !== 409) console.error(err)
-        })
+          if (err.status !== 409) console.error(err);
+        });
 
-      // Para cada disciplina, garante que existe um banco local PouchDB criado
       for (const disc of this.disciplinas) {
-        const localDB = new PouchDB(disc)
-        console.log(`Banco local PouchDB pronto para a disciplina: ${disc}`)
-
-        // Opcional: Buscar dados iniciais dos alunos daquela disciplina (GET /disciplinas/:id)
-        // e alimentar o localDB se ele estiver totalmente vazio.
+        const localDB = new PouchDB(disc);
+        console.log(`Banco local PouchDB pronto para a disciplina: ${disc}`);
       }
-
-      this.statusMensagem = 'Sistema pronto e sincronizado para o uso offline!'
     },
 
     fazerLogout() {
-      // Limpa o cofre e volta para o login
-      localStorage.removeItem('token_ufsc')
-      this.$router.push('/login')
+      localStorage.removeItem("token_ufsc");
+      this.$router.push("/login");
     },
   },
-}
+};
 </script>
 
 <template>
@@ -112,10 +94,6 @@ export default {
     </header>
 
     <main class="conteudo">
-      <div class="status-card">
-        <p><strong>Status:</strong> {{ statusMensagem }}</p>
-      </div>
-
       <div v-if="!carregando" class="disciplinas-secao">
         <h3>Suas Disciplinas Ativas</h3>
 
@@ -123,7 +101,10 @@ export default {
           <div v-for="disc in disciplinas" :key="disc" class="card-disciplina">
             <h4>{{ disc.toUpperCase() }}</h4>
             <p>Banco de dados local sincronizado.</p>
-            <button class="btn-entrar" @click="$router.push(`/chamada/${disc}`)">
+            <button
+              class="btn-entrar"
+              @click="$router.push(`/chamada/${disc}`)"
+            >
               Fazer Chamada
             </button>
           </div>

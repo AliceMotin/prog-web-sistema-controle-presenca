@@ -2,7 +2,6 @@
 export default {
   name: "Login",
 
-  // O data() é onde declaras as tuas variáveis (o antigo ref)
   data() {
     return {
       email: "",
@@ -11,14 +10,11 @@ export default {
     };
   },
 
-  // O methods é onde crias as tuas funções de ação
   methods: {
     async efetuarLogin() {
       try {
-        // Limpa erros de tentativas anteriores
         this.mensagemErro = "";
 
-        // Com a Options API, para aceder às variáveis do data(), usas sempre o "this."
         const resposta = await fetch("http://localhost:7000/login", {
           method: "POST",
           headers: {
@@ -32,40 +28,31 @@ export default {
 
         console.log("O servidor respondeu! O status HTTP é:", resposta.status);
 
-        // Validação do status de erro
         if (!resposta.ok) {
           if (resposta.status === 401) {
             this.mensagemErro = "E-mail ou senha incorretos!";
           } else {
             this.mensagemErro = "Erro no servidor ao tentar fazer login.";
           }
-          return; // Para a execução aqui
+          return;
         }
 
-        // Extrai o JSON e guarda o token
         const dados = await resposta.json();
         localStorage.setItem("token_ufsc", dados.token);
 
         console.log(dados.token);
 
-        // 🔴 2. A MÁGICA SIMPLES: Decodifica o miolo do token JWT para ler o ID
         const base64Url = dados.token.split(".")[1];
         const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
         const dadosDecodificados = JSON.parse(window.atob(base64));
 
         console.log("Usuário logado:", dadosDecodificados.id);
 
-        // 🔴 3. DIRECIONAMENTO INTELIGENTE
         if (dadosDecodificados.id === "admin") {
-          // Se for a secretaria, manda para a tela institucional
           this.$router.push("/institucional");
         } else {
-          // Se for professor, manda para o painel de disciplinas
           this.$router.push("/");
         }
-
-        // No Options API, o roteador fica injetado globalmente e acedes via "this.$router"
-        //this.$router.push("/");
       } catch (error) {
         this.mensagemErro = "Não foi possível conectar ao servidor backend.";
         console.error(error);

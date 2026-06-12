@@ -119,9 +119,7 @@ function autenticar(req, res, next) {
   }
 }
 
-// sincronização
 app.get("/init", async (req, res) => {
-  // deve ser chamada para precriar os bancos de dados
   await criaTodosBancosDados();
   res.end();
 });
@@ -142,19 +140,17 @@ function dadosDiscplina(nome) {
   }
   return [];
 }
-// Professor pergunta sua lista de discplinas
+
 app.get("/disciplinas", autenticar, (req, res) => {
   res.send(retornaListaDisciplinas(req.usuario));
 });
 
-// Professor pergunta informacoes sobre 1 disciplina
 app.get("/disciplinas/:disciplina", autenticar, (req, res) => {
-  const disciplina = req.params.disciplina; //
+  const disciplina = req.params.disciplina;
   let x = dadosDiscplina(disciplina);
   res.send(x);
 });
 
-// professor sincroniza uma disciplina
 app.post("/sync/:disciplina", autenticar, async (req, res) => {
   const disciplina = req.params.disciplina;
   const disciplinas = retornaListaDisciplinas(req.usuario);
@@ -169,20 +165,13 @@ app.post("/sync/:disciplina", autenticar, async (req, res) => {
 
     for (const doc of docs) {
       try {
-        // 1. Tenta buscar o documento no CouchDB para ver se ele já existe
         const docExistente = await db.get(doc._id);
-        // 2. Se existia, nós injetamos o _rev atual dele no documento novo para permitir a atualização
         doc._rev = docExistente._rev;
-        console.log(
-          `Documento ${doc._id} encontrado. Atualizando para a próxima revisão...`
-        );
       } catch (err) {
-        // Se der erro 404 significa que o documento não existe ainda, então tudo bem, criamos do zero
         if (err.statusCode !== 404) throw err;
-        console.log(`Documento ${doc._id} é novo. Criando do zero...`);
+        console.log(`Documento ${doc._id} é novo. Criando do zero`);
       }
 
-      // 3. Insere ou atualiza o documento com segurança
       await db.insert(doc);
       console.log(
         `Documento ${doc._id} gravado com sucesso no banco "${disciplina}"!`
@@ -196,7 +185,6 @@ app.post("/sync/:disciplina", autenticar, async (req, res) => {
   }
 });
 
-// Rota para a Secretaria/Instituição ver as frequências (Estilo de Código Tradicional)
 app.get(
   "/institucional/frequencia/:disciplina",
   autenticar,
@@ -212,15 +200,12 @@ app.get(
     try {
       const db = nano.use(disciplina);
 
-      // Busca todos os documentos dentro do banco daquela disciplina
       const listaDocs = await db.list({ include_docs: true });
       const linhas = listaDocs.rows;
 
-      // 1. Filtra as chamadas usando um laço for tradicional
       const chamadas = [];
       for (let i = 0; i < linhas.length; i++) {
         let doc = linhas[i].doc;
-        // Verifica se o ID começa com "chamada"
         if (doc._id.indexOf("chamada") === 0) {
           chamadas.push(doc);
         }
@@ -232,10 +217,7 @@ app.get(
         });
       }
 
-      // Objeto temporário para acumular as presenças
       const relatorioFrequencia = {};
-
-      // 2. Processa as chamadas para somar totais usando for tradicional
       for (let c = 0; c < chamadas.length; c++) {
         let listaAlunosChamada = chamadas[c].dados;
 
@@ -243,7 +225,6 @@ app.get(
           let alunoObj = listaAlunosChamada[a];
           let nomeAluno = alunoObj.aluno;
 
-          // Se o aluno ainda não foi adicionado ao relatório, inicializa o objeto dele
           if (!relatorioFrequencia[nomeAluno]) {
             relatorioFrequencia[nomeAluno] = {
               nome: nomeAluno,
@@ -266,7 +247,6 @@ app.get(
         }
       }
 
-      // 3. Transforma o objeto temporário no array final calculando as porcentagens
       const resultadoFinal = [];
       const nomesChaves = Object.keys(relatorioFrequencia);
 
@@ -284,7 +264,7 @@ app.get(
           faltas: aluno.faltas,
           totalAulas: aluno.totalAulas,
           frequenciaPorcentagem: `${porcentagem}%`,
-          situacao: porcentagem >= 75 ? "FI" : "RE", // Na UFSC, abaixo de 75% é reprovado por frequência
+          situacao: porcentagem >= 75 ? "FI" : "RE",
         });
       }
 
@@ -296,26 +276,19 @@ app.get(
   }
 );
 
-// Rota para pré-criar o histórico de chamadas de teste (Estilo de Código Tradicional)
 app.get("/init-chamadas", async (req, res) => {
   try {
-    // Lista de disciplinas que queremos popular com histórico
     const disciplinasParaPopular = ["dec0007", "dec0020"];
 
-    // Alunos base para simular a chamada (bater com os seus dados fictícios)
     const alunosBase = ["Ana maria", "pedro", "cintia"];
 
-    // Percorre cada disciplina usando o laço for tradicional
     for (let d = 0; d < disciplinasParaPopular.length; d++) {
       let nomeDisciplina = disciplinasParaPopular[d];
       let db = nano.use(nomeDisciplina);
 
-      console.log(`Iniciando injeção de chamadas no banco: ${nomeDisciplina}`);
-
-      // Vamos gerar 5 dias de aulas retroativas
       for (let i = 5; i >= 1; i--) {
         let dataPassada = new Date();
-        dataPassada.setDate(dataPassada.getDate() - i); // Subtrai i dias da data de hoje
+        dataPassada.setDate(dataPassada.getDate() - i);
 
         let dia = String(dataPassada.getDate()).padStart(2, "0");
         let mes = String(dataPassada.getMonth() + 1).padStart(2, "0");
@@ -324,10 +297,8 @@ app.get("/init-chamadas", async (req, res) => {
         let idFormatado = `chamada_${dia}-${mes}-${ano}`;
         let dataLegivel = `${dia}/${mes}/${ano}`;
 
-        // Monta a lista de alunos com frequências sorteadas (estilo tradicional)
         let dadosAlunosSorteados = [];
         for (let a = 0; a < alunosBase.length; a++) {
-          // Sorteia "presente" ou "falta" (75% de chance de presente)
           let statusSorteado = "presente";
           if (Math.random() > 0.75) {
             statusSorteado = "falta";
@@ -339,23 +310,19 @@ app.get("/init-chamadas", async (req, res) => {
           });
         }
 
-        // Monta o documento final daquela data
         let docChamada = {
           _id: idFormatado,
           data: dataLegivel,
           dados: dadosAlunosSorteados,
         };
 
-        // Verifica se o documento já existe para evitar o erro 409 de conflito
         try {
           let docExistente = await db.get(idFormatado);
-          docChamada._rev = docExistente._rev; // Atualiza a revisão se já existir
+          docChamada._rev = docExistente._rev;
         } catch (err) {
-          // Se der 404, ignora porque o documento é novo e será criado do zero
           if (err.statusCode !== 404) throw err;
         }
 
-        // Grava no CouchDB
         await db.insert(docChamada);
         console.log(` -> Documento ${idFormatado} injetado com sucesso!`);
       }
