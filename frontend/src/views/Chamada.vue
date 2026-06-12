@@ -8,7 +8,7 @@ export default {
     return {
       disciplinaId: "", // Vai guardar o código da matéria (ex: dec0007)
       alunos: [], // Lista de alunos com as suas respetivas aulas/presenças
-      statusMensagem: "A carregar lista de alunos...",
+      //statusMensagem: "A carregar lista de alunos...",
       localDB: null, // Instância do banco PouchDB desta disciplina
     };
   },
@@ -104,7 +104,7 @@ export default {
         await this.salvarAlunosNoPouchDB(dadosServidor);
 
         this.alunos = dadosServidor;
-        this.statusMensagem = "Alunos sincronizados via servidor.";
+        //this.statusMensagem = "Alunos sincronizados via servidor.";
       } catch (error) {
         // 🚨 O MILAGRE DO OFFLINE: Se o fetch falhar, busca do PouchDB!
         this.statusMensagem =
@@ -173,76 +173,73 @@ export default {
       return aula ? aula.status : "pendente";
     },
 
-    async gerarMuitasChamadasDeTeste() {
-      this.carregando = true;
-      this.statusMensagem = "Injetando carga de dados de teste...";
+    // async gerarMuitasChamadasDeTeste() {
+    //   this.carregando = true;
+    //   this.statusMensagem = "Injetando carga de dados de teste...";
 
-      // Vamos usar a disciplina dec0020 como alvo dos testes (ou mude para a que preferir)
-      const disciplinaAlvo = "dec0020";
-      const token = localStorage.getItem("token_ufsc");
+    //   const disciplinaAlvo = "dec0020";
+    //   const token = localStorage.getItem("token_ufsc");
 
-      // 1. Lista base de alunos para simular as chamadas
-      const alunosBase = ["Ana maria", "pedro", "cintia"];
-      const pacotesDeChamadas = [];
+    //   const alunosBase = ["Ana maria", "pedro", "cintia"];
+    //   const pacotesDeChamadas = [];
 
-      // 2. Loop para gerar 5 dias diferentes de aulas no passado
-      for (let i = 5; i >= 1; i--) {
-        const dataPassada = new Date();
-        dataPassada.setDate(dataPassada.getDate() - i); // Subtrai i dias da data de hoje
+    //   for (let i = 5; i >= 1; i--) {
+    //     const dataPassada = new Date();
+    //     dataPassada.setDate(dataPassada.getDate() - i); // Subtrai i dias da data de hoje
 
-        const dia = String(dataPassada.getDate()).padStart(2, "0");
-        const mes = String(dataPassada.getMonth() + 1).padStart(2, "0");
-        const ano = dataPassada.getFullYear();
+    //     const dia = String(dataPassada.getDate()).padStart(2, "0");
+    //     const mes = String(dataPassada.getMonth() + 1).padStart(2, "0");
+    //     const ano = dataPassada.getFullYear();
 
-        const idFormatado = `chamada_${dia}-${mes}-${ano}`;
-        const dataLegivel = `${dia}/${mes}/${ano}`;
+    //     const idFormatado = `chamada_${dia}-${mes}-${ano}`;
+    //     const dataLegivel = `${dia}/${mes}/${ano}`;
 
-        // Monta a lista de alunos com presenças/faltas aleatórias para dar realismo ao gráfico/tabela
-        const dadosAlunosSorteados = alunosBase.map((nome) => {
-          // Sorteia "presente" ou "falta" (75% de chance de presente para a maioria passar)
-          const statusSorteado = Math.random() > 0.25 ? "presente" : "falta";
-          return {
-            aluno: nome,
-            aulas: [{ data: dataLegivel, status: statusSorteado }],
-          };
-        });
+    //     // Monta a lista de alunos com presenças/faltas aleatórias para dar realismo ao gráfico/tabela
+    //     const dadosAlunosSorteados = alunosBase.map((nome) => {
+    //       // Sorteia "presente" ou "falta" (75% de chance de presente para a maioria passar)
+    //       const statusSorteado = Math.random() > 0.25 ? "presente" : "falta";
+    //       return {
+    //         aluno: nome,
+    //         aulas: [{ data: dataLegivel, status: statusSorteado }],
+    //       };
+    //     });
 
-        // Coloca o documento no pacote
-        pacotesDeChamadas.push({
-          _id: idFormatado,
-          data: dataLegivel,
-          dados: dadosAlunosSorteados,
-        });
-      }
+    //     // Coloca o documento no pacote
+    //     pacotesDeChamadas.push({
+    //       _id: idFormatado,
+    //       data: dataLegivel,
+    //       dados: dadosAlunosSorteados,
+    //     });
+    //   }
 
-      try {
-        // 3. Dispara o pacote completo com os 5 dias de uma vez para a rota de sincronização
-        const resposta = await fetch(
-          `http://localhost:7000/sync/${disciplinaAlvo}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ docs: pacotesDeChamadas }), // O server.js faz o loop por cada um deles!
-          }
-        );
+    //   try {
+    //     // 3. Dispara o pacote completo com os 5 dias de uma vez para a rota de sincronização
+    //     const resposta = await fetch(
+    //       `http://localhost:7000/sync/${disciplinaAlvo}`,
+    //       {
+    //         method: "POST",
+    //         headers: {
+    //           "Content-Type": "application/json",
+    //           Authorization: `Bearer ${token}`,
+    //         },
+    //         body: JSON.stringify({ docs: pacotesDeChamadas }), // O server.js faz o loop por cada um deles!
+    //       }
+    //     );
 
-        if (!resposta.ok)
-          throw new Error("O servidor rejeitou a carga de testes.");
+    //     if (!resposta.ok)
+    //       throw new Error("O servidor rejeitou a carga de testes.");
 
-        alert(
-          `Sucesso! 5 chamadas históricas foram injetadas no banco "${disciplinaAlvo}".`
-        );
-        this.statusMensagem = "Dados de teste injetados com sucesso!";
-      } catch (error) {
-        console.error("Erro ao injetar chamadas:", error);
-        alert("Falha ao injetar dados de teste no CouchDB.");
-      } finally {
-        this.carregando = false;
-      }
-    },
+    //     alert(
+    //       `Sucesso! 5 chamadas históricas foram injetadas no banco "${disciplinaAlvo}".`
+    //     );
+    //     this.statusMensagem = "Dados de teste injetados com sucesso!";
+    //   } catch (error) {
+    //     console.error("Erro ao injetar chamadas:", error);
+    //     alert("Falha ao injetar dados de teste no CouchDB.");
+    //   } finally {
+    //     this.carregando = false;
+    //   }
+    // },
 
     async salvarChamadaCompleta() {
       try {
@@ -262,7 +259,7 @@ export default {
 </script>
 
 <template>
-  <div
+  <!-- <div
     class="testes-secao"
     style="
       margin-top: 20px;
@@ -284,17 +281,17 @@ export default {
     >
       ⚡ Injetar 5 Chamadas de Histórico
     </button>
-  </div>
+  </div> -->
 
   <div class="chamada-container">
     <header class="topo">
-      <button @click="$router.push('/')">⬅ Voltar ao Painel</button>
+      <button @click="$router.push('/')">Voltar ao Painel</button>
       <h2>Chamada: {{ disciplinaId ? disciplinaId.toUpperCase() : "" }}</h2>
     </header>
 
-    <div class="status-barra">
+    <!-- <div class="status-barra">
       <p>{{ statusMensagem }}</p>
-    </div>
+    </div> -->
 
     <main class="lista-alunos">
       <div
@@ -325,7 +322,7 @@ export default {
       </div>
 
       <button class="btn-salvar" @click="salvarChamadaCompleta">
-        💾 Salvar Chamada no Navegador
+        Salvar Chamada
       </button>
     </main>
   </div>

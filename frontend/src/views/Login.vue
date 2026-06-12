@@ -48,8 +48,24 @@ export default {
 
         console.log(dados.token);
 
+        // 🔴 2. A MÁGICA SIMPLES: Decodifica o miolo do token JWT para ler o ID
+        const base64Url = dados.token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const dadosDecodificados = JSON.parse(window.atob(base64));
+
+        console.log("Usuário logado:", dadosDecodificados.id);
+
+        // 🔴 3. DIRECIONAMENTO INTELIGENTE
+        if (dadosDecodificados.id === "admin") {
+          // Se for a secretaria, manda para a tela institucional
+          this.$router.push("/institucional");
+        } else {
+          // Se for professor, manda para o painel de disciplinas
+          this.$router.push("/");
+        }
+
         // No Options API, o roteador fica injetado globalmente e acedes via "this.$router"
-        this.$router.push("/");
+        //this.$router.push("/");
       } catch (error) {
         this.mensagemErro = "Não foi possível conectar ao servidor backend.";
         console.error(error);

@@ -41,7 +41,7 @@ const dec0007 = [
 const dec0020 = [
   { aluno: "Ana maria", aulas: [] },
   { aluno: "pedro", aulas: [] },
-  { aluno: "cintua", aulas: [] },
+  { aluno: "cintia", aulas: [] },
 ];
 const semestre = [
   { disciplina: "dec0007", dados: dec0007 },
@@ -77,6 +77,11 @@ async function criaTodosBancosDados() {
 
 app.post("/login", (req, res) => {
   const { email, senha } = req.body;
+
+  if (email === "admin@ufsc.br" && senha === "admin") {
+    const token = jwt.sign({ id: "admin" }, SECRET);
+    return res.json({ token });
+  }
 
   const prof = professores.find((p) => p.email === email && p.senha === senha);
 
@@ -191,78 +196,177 @@ app.post("/sync/:disciplina", autenticar, async (req, res) => {
   }
 });
 
-// Rota para a Secretaria/Instituição ver as frequências
-app.get("/institucional/frequencia/:disciplina", async (req, res) => {
-  const disciplina = req.params.disciplina;
-
-  try {
-    const db = nano.use(disciplina);
-
-    // Busca todos os documentos dentro do banco daquela disciplina
-    const listaDocs = await db.list({ include_docs: true });
-
-    // Se você salvou usando o padrão 'chamada_atualizada' ou 'chamada_DATA'
-    // Vamos filtrar apenas os documentos que contêm os dados dos alunos
-    const chamadas = listaDocs.rows
-      .map((row) => row.doc)
-      .filter((doc) => doc._id.startsWith("chamada")); // filtra lixos de configuração se houver
-
-    if (chamadas.length === 0) {
+// Rota para a Secretaria/Instituição ver as frequências (Estilo de Código Tradicional)
+app.get(
+  "/institucional/frequencia/:disciplina",
+  autenticar,
+  async (req, res) => {
+    if (req.usuario !== "admin") {
       return res
-        .status(404)
-        .json({ mensagem: "Nenhuma chamada registrada para esta disciplina." });
+        .status(403)
+        .send("Acesso negado. Apenas a administração pode ver estes dados.");
     }
 
-    // Objeto para consolidar o relatório final dos alunos
-    const relatorioFrequencia = {};
+    const disciplina = req.params.disciplina;
 
-    // Processa cada chamada para somar as presenças
-    chamadas.forEach((chamada) => {
-      chamada.dados.forEach((alunoObj) => {
-        const nome = alunoObj.aluno;
+    try {
+      const db = nano.use(disciplina);
 
-        if (!relatorioFrequencia[nome]) {
-          relatorioFrequencia[nome] = {
-            nome: nome,
-            presencas: 0,
-            faltas: 0,
-            totalAulas: 0,
-          };
+      // Busca todos os documentos dentro do banco daquela disciplina
+      const listaDocs = await db.list({ include_docs: true });
+      const linhas = listaDocs.rows;
+
+      // 1. Filtra as chamadas usando um laço for tradicional
+      const chamadas = [];
+      for (let i = 0; i < linhas.length; i++) {
+        let doc = linhas[i].doc;
+        // Verifica se o ID começa com "chamada"
+        if (doc._id.indexOf("chamada") === 0) {
+          chamadas.push(doc);
+        }
+      }
+
+      if (chamadas.length === 0) {
+        return res.status(404).json({
+          mensagem: "Nenhuma chamada registrada para esta disciplina.",
+        });
+      }
+
+      // Objeto temporário para acumular as presenças
+      const relatorioFrequencia = {};
+
+      // 2. Processa as chamadas para somar totais usando for tradicional
+      for (let c = 0; c < chamadas.length; c++) {
+        let listaAlunosChamada = chamadas[c].dados;
+
+        for (let a = 0; a < listaAlunosChamada.length; a++) {
+          let alunoObj = listaAlunosChamada[a];
+          let nomeAluno = alunoObj.aluno;
+
+          // Se o aluno ainda não foi adicionado ao relatório, inicializa o objeto dele
+          if (!relatorioFrequencia[nomeAluno]) {
+            relatorioFrequencia[nomeAluno] = {
+              nome: nomeAluno,
+              presencas: 0,
+              faltas: 0,
+              totalAulas: 0,
+            };
+          }
+
+          let listaAulas = alunoObj.aulas;
+          for (let au = 0; au < listaAulas.length; au++) {
+            relatorioFrequencia[nomeAluno].totalAulas++;
+
+            if (listaAulas[au].status === "presente") {
+              relatorioFrequencia[nomeAluno].presencas++;
+            } else {
+              relatorioFrequencia[nomeAluno].faltas++;
+            }
+          }
+        }
+      }
+
+      // 3. Transforma o objeto temporário no array final calculando as porcentagens
+      const resultadoFinal = [];
+      const nomesChaves = Object.keys(relatorioFrequencia);
+
+      for (let k = 0; k < nomesChaves.length; k++) {
+        let aluno = relatorioFrequencia[nomesChaves[k]];
+
+        let porcentagem = 0;
+        if (aluno.totalAulas > 0) {
+          porcentagem = ((aluno.presencas / aluno.totalAulas) * 100).toFixed(1);
         }
 
-        // Verifica o status de cada aula dentro do array do aluno
-        alunoObj.aulas.forEach((aula) => {
-          relatorioFrequencia[nome].totalAulas++;
-          if (aula.status === "presente") {
-            relatorioFrequencia[nome].presencas++;
-          } else {
-            relatorioFrequencia[nome].faltas++;
-          }
+        resultadoFinal.push({
+          nome: aluno.nome,
+          presencas: aluno.presencas,
+          faltas: aluno.faltas,
+          totalAulas: aluno.totalAulas,
+          frequenciaPorcentagem: `${porcentagem}%`,
+          situacao: porcentagem >= 75 ? "FI" : "RE", // Na UFSC, abaixo de 75% é reprovado por frequência
         });
-      });
-    });
+      }
 
-    // Transforma o objeto em um array e calcula a porcentagem de frequência de cada um
-    const resultadoFinal = Object.values(relatorioFrequencia).map((aluno) => {
-      const porcentagem =
-        aluno.totalAulas > 0
-          ? ((aluno.presencas / aluno.totalAulas) * 100).toFixed(1)
-          : 0;
+      res.json(resultadoFinal);
+    } catch (err) {
+      console.error("Erro ao gerar relatório institucional:", err);
+      res.status(500).send("Erro interno ao buscar dados institucionais");
+    }
+  }
+);
 
-      return {
-        nome: aluno.nome,
-        presencas: aluno.presencas,
-        faltas: aluno.faltas,
-        totalAulas: aluno.totalAulas,
-        frequenciaPorcentagem: `${porcentagem}%`,
-        situacao: porcentagem >= 75 ? "FI" : "RE", // FI = Frequência Insuficiente (Abaixo de 75% na UFSC reprova)
-      };
-    });
+// Rota para pré-criar o histórico de chamadas de teste (Estilo de Código Tradicional)
+app.get("/init-chamadas", async (req, res) => {
+  try {
+    // Lista de disciplinas que queremos popular com histórico
+    const disciplinasParaPopular = ["dec0007", "dec0020"];
 
-    res.json(resultadoFinal);
+    // Alunos base para simular a chamada (bater com os seus dados fictícios)
+    const alunosBase = ["Ana maria", "pedro", "cintia"];
+
+    // Percorre cada disciplina usando o laço for tradicional
+    for (let d = 0; d < disciplinasParaPopular.length; d++) {
+      let nomeDisciplina = disciplinasParaPopular[d];
+      let db = nano.use(nomeDisciplina);
+
+      console.log(`Iniciando injeção de chamadas no banco: ${nomeDisciplina}`);
+
+      // Vamos gerar 5 dias de aulas retroativas
+      for (let i = 5; i >= 1; i--) {
+        let dataPassada = new Date();
+        dataPassada.setDate(dataPassada.getDate() - i); // Subtrai i dias da data de hoje
+
+        let dia = String(dataPassada.getDate()).padStart(2, "0");
+        let mes = String(dataPassada.getMonth() + 1).padStart(2, "0");
+        let ano = dataPassada.getFullYear();
+
+        let idFormatado = `chamada_${dia}-${mes}-${ano}`;
+        let dataLegivel = `${dia}/${mes}/${ano}`;
+
+        // Monta a lista de alunos com frequências sorteadas (estilo tradicional)
+        let dadosAlunosSorteados = [];
+        for (let a = 0; a < alunosBase.length; a++) {
+          // Sorteia "presente" ou "falta" (75% de chance de presente)
+          let statusSorteado = "presente";
+          if (Math.random() > 0.75) {
+            statusSorteado = "falta";
+          }
+
+          dadosAlunosSorteados.push({
+            aluno: alunosBase[a],
+            aulas: [{ data: dataLegivel, status: statusSorteado }],
+          });
+        }
+
+        // Monta o documento final daquela data
+        let docChamada = {
+          _id: idFormatado,
+          data: dataLegivel,
+          dados: dadosAlunosSorteados,
+        };
+
+        // Verifica se o documento já existe para evitar o erro 409 de conflito
+        try {
+          let docExistente = await db.get(idFormatado);
+          docChamada._rev = docExistente._rev; // Atualiza a revisão se já existir
+        } catch (err) {
+          // Se der 404, ignora porque o documento é novo e será criado do zero
+          if (err.statusCode !== 404) throw err;
+        }
+
+        // Grava no CouchDB
+        await db.insert(docChamada);
+        console.log(` -> Documento ${idFormatado} injetado com sucesso!`);
+      }
+    }
+
+    res.send(
+      "Carga de dados de chamadas históricas realizada com sucesso nas disciplinas!"
+    );
   } catch (err) {
-    console.error("Erro ao gerar relatório institucional:", err);
-    res.status(500).send("Erro interno ao buscar dados institucionais");
+    console.error("Erro ao inicializar dados de teste:", err.message);
+    res.status(500).send("Erro interno ao gerar histórico de testes.");
   }
 });
 

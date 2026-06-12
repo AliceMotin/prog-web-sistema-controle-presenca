@@ -1,6 +1,7 @@
 <template>
   <div class="admin-container">
     <header class="admin-topo">
+      <button @click="fazerLogout">Ir para Login</button>
       <h2>Portal Administrativo UFSC - Controle de Frequência</h2>
     </header>
 
@@ -80,20 +81,49 @@ export default {
       this.alunosRelatorio = [];
 
       try {
-        const resposta = await fetch(
-          `http://localhost:7000/institucional/frequencia/${this.disciplinaBusca.toLowerCase()}`
-        );
+        // 1. Pega o token que foi guardado no momento do login
+        const token = localStorage.getItem("token_ufsc");
 
-        if (!resposta.ok) {
-          throw new Error(
-            "Disciplina não encontrada ou sem chamadas registradas."
-          );
+        if (!token) {
+          this.erro =
+            "Você não está autenticado. Por favor, faça login novamente.";
+          return;
         }
 
+        // 2. Faz a requisição enviando o token no cabeçalho Authorization
+        // Repare na rota: estamos passando a disciplina em letras minúsculas para bater com o CouchDB
+        const resposta = await fetch(
+          `http://localhost:7000/institucional/frequencia/${this.disciplinaBusca.toLowerCase()}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              // 🔴 O SEGREDO ESTÁ AQUI: O "Bearer " precisa do espaço e do token logo em seguida!
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        // 3. Trata as respostas de erro do servidor
+        if (!resposta.ok) {
+          if (resposta.status === 401) {
+            throw new Error(
+              "Sessão expirada ou token inválido. Faça login novamente."
+            );
+          }
+        }
+
+        // 4. Se deu tudo certo, joga os dados na tabela
         this.alunosRelatorio = await resposta.json();
       } catch (err) {
         this.erro = err.message;
+        console.error("Erro na busca institucional:", err);
       }
+    },
+    fazerLogout() {
+      // Limpa o cofre e volta para o login
+      localStorage.removeItem("token_ufsc");
+      this.$router.push("/login");
     },
   },
 };
