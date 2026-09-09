@@ -33,8 +33,8 @@ A aplicação utiliza o conceito de **Offline-First**, empregando o **PouchDB** 
 
 ### 1. Clonar o repositório
 ```bash
-git clone [https://github.com/seu-usuario/nome-do-repositorio.git](https://github.com/seu-usuario/nome-do-repositorio.git)
-cd nome-do-repositorio
+git clone [https://github.com/AliceMotin/prog-web-sistema-controle-presenca.git](https://github.com/AliceMotin/prog-web-sistema-controle-presenca.git)
+cd prog-web-sistema-controle-presenca
 ```
 ### 2. Instalar as dependências
 ```bash
